@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Online Classroom - Rooms</title>
+<style>
+body { margin:0; font-family:"Segoe UI", sans-serif; background:#f8faff; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; padding-top:50px;}
+.container { background:#fff; padding:30px 25px; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,0.1); width:400px;}
+h2 { text-align:center; color:#2c3e50; margin-bottom:20px; }
+input { width:100%; padding:12px; margin:10px 0; border:1px solid #dcdfe6; border-radius:8px; outline:none; font-size:14px; }
+button { width:100%; padding:12px; margin-top:12px; border:none; border-radius:8px; font-size:16px; cursor:pointer; background:#4f46e5; color:#fff; transition:0.3s; }
+button:hover { background:#4338ca; }
+.switch { text-align:center; margin-top:15px; font-size:14px; cursor:pointer; color:#4f46e5; }
+#logout-btn { margin-top: 20px; background:#e74c3c; }
+#logout-btn:hover { background:#c0392b; }
+.copy-btn { margin-top: 8px; background:#2ecc71; }
+.copy-btn:hover { background:#27ae60; }
+</style>
+</head>
+<body>
+<div class="container" id="create-container">
+  <h2>Create Room</h2>
+  <input type="text" id="room-name" placeholder="Room Name" />
+  <input type="password" id="room-password" placeholder="Room Password" />
+  <button id="create-room-btn">Create Room</button>
+  <button id="copy-room-id" class="copy-btn" style="display:none;">Copy Room ID</button>
+  <div class="switch" id="go-join">Already have a room? Join</div>
+  <button id="logout-btn">Logout</button>
+</div>
+
+<div class="container" id="join-container" style="display:none;">
+  <h2>Join Room</h2>
+  <input type="text" id="join-room-id" placeholder="Room ID" />
+  <input type="text" id="join-username" placeholder="Your Name" />
+  <input type="password" id="join-room-password" placeholder="Room Password" />
+  <button id="join-room-btn">Join Room</button>
+  <div class="switch" id="go-create">Don't have a room? Create</div>
+  <button id="logout-btn-join">Logout</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyA_cKg4aCmS2EUJhE8Baq-wQK26Smu7pxY",
+  authDomain: "myclassroom-67acf.firebaseapp.com",
+  projectId: "myclassroom-67acf",
+  storageBucket: "myclassroom-67acf.appspot.com",
+  messagingSenderId: "319313107001",
+  appId: "1:319313107001:web:52e7f5ca05e8721dded5e8"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const createContainer = document.getElementById("create-container");
+const joinContainer = document.getElementById("join-container");
+const copyBtn = document.getElementById("copy-room-id");
+
+// Switch view
+document.getElementById("go-join").addEventListener("click", () => {
+  createContainer.style.display = "none";
+  joinContainer.style.display = "block";
+});
+document.getElementById("go-create").addEventListener("click", () => {
+  joinContainer.style.display = "none";
+  createContainer.style.display = "block";
+});
+
+// Logout
+const logoutBtns = [document.getElementById("logout-btn"), document.getElementById("logout-btn-join")];
+logoutBtns.forEach(btn => {
+  btn.addEventListener("click", async () => {
+    await signOut(auth);
+    alert("✅ Logged Out!");
+    window.location.href = "login.html"; 
+  });
+});
+
+// Check login status
+onAuthStateChanged(auth, user => {
+  if(!user){
+    alert("❌ You must login first!");
+    window.location.href = "login.html"; 
+  }
+});
+
+// Create Room
+document.getElementById("create-room-btn").addEventListener("click", async () => {
+  const name = document.getElementById("room-name").value.trim();
+  const password = document.getElementById("room-password").value.trim();
+  if(!name || !password){ alert("Enter Room Name & Password!"); return; }
+
+  try {
+    const docRef = await addDoc(collection(db, "rooms"), {
+      name, password, createdBy: auth.currentUser.uid, createdAt: new Date()
+    });
+    alert(`✅ Room Created! Your Room ID: ${docRef.id}`);
+
+    // Show copy button
+    copyBtn.style.display = "block";
+    copyBtn.onclick = ()=> {
+      navigator.clipboard.writeText(docRef.id);
+      alert("Room ID Copied!");
+    };
+
+    // Redirect to whiteboard page after 1s
+    setTimeout(()=> {
+      window.location.href = `whiteboard.html?roomId=${docRef.id}&username=${auth.currentUser.displayName || 'User'}`;
+    }, 1000);
+
+  } catch(err){ alert("❌ " + err.message); }
+});
+
+// Join Room
+document.getElementById("join-room-btn").addEventListener("click", async () => {
+  const roomId = document.getElementById("join-room-id").value.trim();
+  const username = document.getElementById("join-username").value.trim();
+  const password = document.getElementById("join-room-password").value.trim();
+  if(!roomId || !username || !password){ alert("Enter Room ID, Name & Password!"); return; }
+
+  try {
+    const roomDoc = await getDoc(doc(db, "rooms", roomId));
+    if(!roomDoc.exists()){ alert("❌ Room not found!"); return; }
+    const roomData = roomDoc.data();
+    if(roomData.password !== password){ alert("❌ Wrong Room Password!"); return; }
+
+    alert(`✅ Welcome ${username} to Room: ${roomData.name}`);
+    // Redirect to whiteboard page
+    window.location.href = `whiteboard.html?roomId=${roomId}&username=${username}`;
+  } catch(err){ alert("❌ " + err.message); }
+});
+
+</script>
+</body>
+</html>

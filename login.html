@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Online Classroom - Google Login</title>
+<style>
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  background: #f8faff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+.auth-container {
+  background: #ffffff;
+  width: 350px;
+  padding: 40px 30px;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+.auth-container h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+.btn-google {
+  background: #ffffff;
+  border: 1px solid #ccc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  color: #444;
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: 0.3s;
+}
+.btn-google img {
+  width: 20px;
+}
+.btn-google:hover {
+  background: #f1f1f1;
+}
+</style>
+</head>
+<body>
+<div class="auth-container">
+  <h2>Login with Google</h2>
+  <button id="google-btn" class="btn-google">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" />
+    Continue with Google
+  </button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+// 🔹 Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyA_cKg4aCmS2EUJhE8Baq-wQK26Smu7pxY",
+  authDomain: "myclassroom-67acf.firebaseapp.com",
+  projectId: "myclassroom-67acf",
+  storageBucket: "myclassroom-67acf.appspot.com",
+  messagingSenderId: "319313107001",
+  appId: "1:319313107001:web:52e7f5ca05e8721dded5e8"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+const googleBtn = document.getElementById("google-btn");
+
+// 👉 Auto redirect if already logged in
+onAuthStateChanged(auth, user => {
+  if(user){
+    window.location.href = "create.html"; // Already logged in, redirect
+  }
+});
+
+// Google Login
+googleBtn.addEventListener("click", async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    alert(`✅ Login Successful!\nHello ${user.displayName}`);
+    // Redirect to room create page
+    window.location.href = "create.html";
+  } catch (error) {
+    alert("❌ " + error.message);
+  }
+});
+</script>
+</body>
+</html>
