@@ -1,33 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Online Classroom - Whiteboard & Voice</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Online Classroom - Whiteboard, Text & Voice</title>
 <style>
   body { margin:0; font-family:"Segoe UI",sans-serif; background:#f8faff; display:flex; flex-direction:column; align-items:center; }
-  #toolbar { margin:10px; display:flex; gap:10px; flex-wrap:wrap; }
+  #toolbar { margin:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   #board { border:1px solid #ccc; background:#fff; touch-action:none; }
   button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; background:#4f46e5; color:#fff; }
   button:hover { background:#4338ca; }
   #voice-status { font-weight:bold; margin-left:10px; }
+  #room-timer { font-weight:bold; margin-left:10px; }
 </style>
 </head>
 <body>
 
 <div id="toolbar">
-  <input type="color" id="color-picker" value="#000000" />
+  <input type="color" id="color-picker" value="#000000">
   <button id="eraser-btn">Eraser: Off</button>
   <button id="clear-btn">Clear Board</button>
+  <button id="text-btn">Text: Off</button>
   <button id="leave-room">Leave Room</button>
   <span id="voice-status">Voice: Off</span>
   <span id="room-timer">00:00:00</span>
 </div>
+
 <canvas id="board" width="800" height="500"></canvas>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, doc, collection, setDoc, deleteDoc, onSnapshot, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -38,180 +41,158 @@ const firebaseConfig = {
   messagingSenderId: "319313107001",
   appId: "1:319313107001:web:52e7f5ca05e8721dded5e8"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Room info from URL
+// Room info
 const params = new URLSearchParams(window.location.search);
 const roomId = params.get("roomId");
 const username = params.get("username");
+if(!roomId || !username){ alert("Invalid Room!"); window.location.href="login.html"; }
+onAuthStateChanged(auth, user => { if(!user){ alert("Login required!"); window.location.href="login.html"; } });
 
-if(!roomId || !username){
-  alert("Invalid Room!"); 
-  window.location.href = "login.html";
-}
-
-// Login check
-onAuthStateChanged(auth, user => {
-  if(!user){
-    alert("Login required!");
-    window.location.href = "login.html";
-  }
-});
-
-// Canvas
+// Canvas setup
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
-let drawing = false;
-let color = document.getElementById("color-picker").value;
-let eraser = false;
-let lastPos = null;
+let drawing=false, eraser=false, color=document.getElementById("color-picker").value, currentStroke=[];
+let textMode=false;
 
-document.getElementById("color-picker").addEventListener("change", e=> color = e.target.value);
-document.getElementById("eraser-btn").addEventListener("click", ()=>{
-  eraser = !eraser;
-  document.getElementById("eraser-btn").innerText = `Eraser: ${eraser?"On":"Off"}`;
-});
-document.getElementById("clear-btn").addEventListener("click", async ()=>{
-  const drawingsCol = collection(db,"rooms",roomId,"drawings");
-  const snapshot = await getDoc(doc(db,"rooms",roomId));
-  // delete all drawings
-  onSnapshot(drawingsCol, snap=>{
-    snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"drawings",d.id)));
-  });
-});
+// Toolbar
+document.getElementById("color-picker").addEventListener("change", e=>color=e.target.value);
+document.getElementById("eraser-btn").addEventListener("click", ()=>{ eraser=!eraser; document.getElementById("eraser-btn").innerText=`Eraser: ${eraser?"On":"Off"}`; });
+document.getElementById("text-btn").addEventListener("click", ()=>{ textMode=!textMode; document.getElementById("text-btn").innerText=`Text: ${textMode?"On":"Off"}`; });
 
-canvas.addEventListener("mousedown", e=>{drawing=true; lastPos=getPos(e);});
-canvas.addEventListener("mouseup", e=>{drawing=false; lastPos=null;});
-canvas.addEventListener("mouseout", e=>{drawing=false; lastPos=null;});
-canvas.addEventListener("mousemove", draw);
-canvas.addEventListener("touchstart", e=>{drawing=true; lastPos=getPos(e.touches[0]); e.preventDefault();});
-canvas.addEventListener("touchend", e=>{drawing=false; lastPos=null; e.preventDefault();});
-canvas.addEventListener("touchmove", e=>{draw(e.touches[0]); e.preventDefault();});
+// Helpers
+function getPos(e){ const rect=canvas.getBoundingClientRect(); return {x:e.clientX-rect.left, y:e.clientY-rect.top}; }
 
-function getPos(e){
-  const rect = canvas.getBoundingClientRect();
-  return {x:e.clientX - rect.left, y:e.clientY - rect.top};
-}
-
-async function draw(e){
+// Drawing functions
+function startDraw(pos){ drawing=true; currentStroke=[pos]; }
+function moveDraw(pos){
   if(!drawing) return;
-  const pos = getPos(e);
+  const last=currentStroke[currentStroke.length-1];
   ctx.strokeStyle = eraser?"#fff":color;
   ctx.lineWidth = eraser?20:2;
-  ctx.lineCap = "round";
-  if(lastPos){
-    ctx.beginPath();
-    ctx.moveTo(lastPos.x,lastPos.y);
-    ctx.lineTo(pos.x,pos.y);
-    ctx.stroke();
-  }
-  lastPos = pos;
-
-  // save to firestore
-  const docRef = doc(db,"rooms",roomId,"drawings",Date.now().toString());
-  setDoc(docRef,{
-    x1: lastPos.x,
-    y1: lastPos.y,
-    x2: pos.x,
-    y2: pos.y,
-    color: ctx.strokeStyle,
-    width: ctx.lineWidth
-  });
+  ctx.lineCap="round";
+  ctx.beginPath();
+  ctx.moveTo(last.x,last.y);
+  ctx.lineTo(pos.x,pos.y);
+  ctx.stroke();
+  currentStroke.push(pos);
+}
+async function endDraw(){
+  drawing=false;
+  if(currentStroke.length>1) await addDoc(collection(db,"rooms",roomId,"drawings"),{stroke:currentStroke,color:ctx.strokeStyle,width:ctx.lineWidth});
 }
 
-// Listen for drawings from others
-const drawingsCol = collection(db,"rooms",roomId,"drawings");
-onSnapshot(drawingsCol, snapshot=>{
+// Text function
+canvas.addEventListener("click", async (e)=>{
+  if(!textMode) return;
+  const pos = getPos(e);
+  const text = prompt("Enter text:");
+  if(!text) return;
+  ctx.fillStyle=color;
+  ctx.font="20px Arial";
+  ctx.fillText(text,pos.x,pos.y);
+  await addDoc(collection(db,"rooms",roomId,"texts"),{x:pos.x,y:pos.y,text,color});
+});
+
+// Mouse & Touch events
+canvas.addEventListener("mousedown", e=>{ if(!textMode) startDraw(getPos(e)); });
+canvas.addEventListener("mousemove", e=>{ if(!textMode) moveDraw(getPos(e)); });
+canvas.addEventListener("mouseup", endDraw);
+canvas.addEventListener("mouseout", endDraw);
+canvas.addEventListener("touchstart", e=>{ if(!textMode) startDraw(getPos(e.touches[0])); e.preventDefault(); });
+canvas.addEventListener("touchmove", e=>{ if(!textMode) moveDraw(getPos(e.touches[0])); e.preventDefault(); });
+canvas.addEventListener("touchend", endDraw);
+
+// Clear board
+document.getElementById("clear-btn").addEventListener("click", async ()=>{
+  const drawingsCol = collection(db,"rooms",roomId,"drawings");
+  const textsCol = collection(db,"rooms",roomId,"texts");
+  onSnapshot(drawingsCol, snap=>snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"drawings",d.id))));
+  onSnapshot(textsCol, snap=>snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"texts",d.id))));
+});
+
+// Listen Firestore for live drawings
+onSnapshot(collection(db,"rooms",roomId,"drawings"), snapshot=>{
   snapshot.docChanges().forEach(change=>{
-    const d = change.doc.data();
-    if(change.type === "added"){
-      ctx.strokeStyle = d.color;
-      ctx.lineWidth = d.width;
+    if(change.type==="added"){
+      const d = change.doc.data();
+      const s = d.stroke;
+      ctx.strokeStyle=d.color; ctx.lineWidth=d.width;
       ctx.beginPath();
-      ctx.moveTo(d.x1,d.y1);
-      ctx.lineTo(d.x2,d.y2);
-      ctx.stroke();
+      for(let i=1;i<s.length;i++){ ctx.moveTo(s[i-1].x,s[i-1].y); ctx.lineTo(s[i].x,s[i].y); ctx.stroke(); }
     }
-    else if(change.type === "removed"){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+    else if(change.type==="removed"){ ctx.clearRect(0,0,canvas.width,canvas.height); }
+  });
+});
+
+// Listen Firestore for live texts
+onSnapshot(collection(db,"rooms",roomId,"texts"), snapshot=>{
+  snapshot.docChanges().forEach(change=>{
+    if(change.type==="added"){
+      const t = change.doc.data();
+      ctx.fillStyle=t.color;
+      ctx.font="20px Arial";
+      ctx.fillText(t.text,t.x,t.y);
     }
   });
 });
 
-// Room Timer
-let startTime = Date.now();
+// Room timer
+let startTime=Date.now();
 setInterval(()=>{
   let elapsed = Date.now()-startTime;
-  let h = Math.floor(elapsed/3600000);
-  let m = Math.floor((elapsed%3600000)/60000);
-  let s = Math.floor((elapsed%60000)/1000);
-  document.getElementById("room-timer").innerText = 
-    `${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;
+  let h=Math.floor(elapsed/3600000), m=Math.floor((elapsed%3600000)/60000), s=Math.floor((elapsed%60000)/1000);
+  document.getElementById("room-timer").innerText=`${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;
 },1000);
 
 // Leave Room
-document.getElementById("leave-room").addEventListener("click", async ()=>{
-  await signOut(auth);
-  window.location.href="login.html";
-});
+document.getElementById("leave-room").addEventListener("click", async ()=>{ await signOut(auth); window.location.href="login.html"; });
 
-// ===== Voice System (WebRTC) =====
-let localStream;
-let peers={};
-const voiceStatus = document.getElementById("voice-status");
-
+// Voice System
+let localStream, peers={};
+const voiceStatus=document.getElementById("voice-status");
 async function initVoice(){
   try{
     localStream = await navigator.mediaDevices.getUserMedia({audio:true});
-    voiceStatus.innerText = "Voice: On";
-
-    const signalsCol = collection(db,"rooms",roomId,"signals");
-
+    voiceStatus.innerText="Voice: On";
+    const signalsCol=collection(db,"rooms",roomId,"signals");
     onSnapshot(signalsCol,snapshot=>{
       snapshot.docChanges().forEach(async change=>{
         if(change.type!=="added") return;
-        const data = change.doc.data();
+        const data=change.doc.data();
         if(data.sender===auth.currentUser.uid) return;
-
-        const peerId = data.sender;
+        const peerId=data.sender;
         if(!peers[peerId]){
-          const pc = new RTCPeerConnection();
+          const pc=new RTCPeerConnection();
           localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-          pc.ontrack = e=>{
-            const audio = document.createElement("audio");
-            audio.srcObject = e.streams[0];
-            audio.autoplay = true;
-            document.body.appendChild(audio);
-          };
+          pc.ontrack=e=>{ const audio=document.createElement("audio"); audio.srcObject=e.streams[0]; audio.autoplay=true; document.body.appendChild(audio); };
           peers[peerId]=pc;
         }
-        const pc = peers[peerId];
-
-        if(data.type==="offer"){
-          await pc.setRemoteDescription(data.offer);
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await addDoc(signalsCol,{sender:auth.currentUser.uid,type:"answer",answer});
-        }
-        else if(data.type==="answer"){
-          await pc.setRemoteDescription(data.answer);
-        }
-        else if(data.type==="ice"){
-          await pc.addIceCandidate(data.candidate);
-        }
-      });
-    });
-
-  }catch(err){
-    voiceStatus.innerText = "Voice: Off";
-    alert("Mic access denied or error!");
-  }
+        const pc=peers[peerId];
+        if(data.type==="offer"){ await pc.setRemoteDescription(data.offer); const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); await addDoc(signalsCol,{sender:auth.currentUser.uid,type:"answer",answer}); }
+        else if (data.type === "answer") {
+  await pc.setRemoteDescription(data.answer);
+}
+else if (data.type === "ice") {
+  await pc.addIceCandidate(data.candidate);
+                  }
+});
+});
+} catch (err) {
+  voiceStatus.innerText = "Voice: Off";
+  console.error("Voice error:", err);
+}
 }
 initVoice();
-
-</script>
+</script> 
 </body>
 </html>
+        
+        
+        
+        
+        
+        
