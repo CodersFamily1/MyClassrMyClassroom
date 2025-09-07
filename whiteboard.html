@@ -5,18 +5,69 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Online Classroom - Whiteboard, Text & Voice</title>
 <style>
-  body { margin:0; font-family:"Segoe UI",sans-serif; background:#f8faff; display:flex; flex-direction:column; align-items:center; transition:background 0.3s, color 0.3s; }
-  #toolbar { margin:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  #board { border:1px solid #ccc; background:#fff; touch-action:none; transition:background 0.3s; }
-  button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; background:#4f46e5; color:#fff; }
-  button:hover { background:#4338ca; }
-  #room-timer { font-weight:bold; margin-left:10px; }
+  body { 
+    margin:0; 
+    font-family:"Segoe UI",sans-serif; 
+    background:#f8faff; 
+    display:flex; 
+    flex-direction:column; 
+    align-items:center; 
+    transition:background 0.3s, color 0.3s; 
+  }
+  #toolbar { 
+    margin:10px; 
+    display:flex; 
+    gap:10px; 
+    flex-wrap:wrap; 
+    align-items:center; 
+  }
+  #board { 
+    border:1px solid #ccc; 
+    background:#fff; 
+    touch-action:none; 
+    transition:background 0.3s; 
+  }
+  button { 
+    padding:8px 12px; 
+    border:none; 
+    border-radius:6px; 
+    cursor:pointer; 
+    background:#4f46e5; 
+    color:#fff; 
+    transition:background 0.3s; 
+  }
+  button:hover { 
+    background:#4338ca; 
+  }
+  #copy-room-btn { 
+    background:#f59e0b; /* Different color for copy button */ 
+    color:#fff; 
+  }
+  #room-timer { 
+    font-weight:bold; 
+    margin-left:10px; 
+  }
 
   /* Dark mode */
-  body.dark-mode { background:#111; color:#eee; }
-  body.dark-mode #board { background:#222; border:1px solid #555; }
-  body.dark-mode button { background:#333; color:#eee; }
-  body.dark-mode button:hover { background:#444; }
+  body.dark-mode { 
+    background:#111; 
+    color:#eee; 
+  }
+  body.dark-mode #board { 
+    background:#222; 
+    border:1px solid #555; 
+  }
+  body.dark-mode button { 
+    background:#333; 
+    color:#eee; 
+  }
+  body.dark-mode button:hover { 
+    background:#444; 
+  }
+  body.dark-mode #copy-room-btn { 
+    background:#d97706; 
+    color:#fff; 
+  }
 </style>
 </head>
 <body>
@@ -27,6 +78,7 @@
   <button id="clear-all-btn">Clear All</button>
   <button id="text-btn">Text: Off</button>
   <button id="dark-mode-btn">Dark Mode</button>
+  <button id="copy-room-btn">Copy Room ID</button>
   <button id="leave-room">Leave Room</button>
   <span id="room-timer">00:00:00</span>
 </div>
@@ -86,6 +138,13 @@ document.getElementById("dark-mode-btn").addEventListener("click", ()=>{
   } else {
     btn.innerText="Dark Mode";
   }
+});
+
+// Copy Room ID
+document.getElementById("copy-room-btn").addEventListener("click", ()=>{
+  navigator.clipboard.writeText(roomId)
+    .then(()=> alert("Room ID copied!"))
+    .catch(()=> alert("Failed to copy Room ID"));
 });
 
 // Helpers
@@ -190,8 +249,8 @@ setInterval(()=>{
 // Leave Room
 document.getElementById("leave-room").addEventListener("click", async ()=>{
   await signOut(auth);
-  window.location.href="login.html";
+  window.location.href = "login.html";
 });
 </script>
-</body>
+</body> 
 </html>
