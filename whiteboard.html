@@ -5,23 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Online Classroom - Whiteboard, Text & Voice</title>
 <style>
-  body { margin:0; font-family:"Segoe UI",sans-serif; background:#f8faff; display:flex; flex-direction:column; align-items:center; }
+  body { margin:0; font-family:"Segoe UI",sans-serif; background:#f8faff; display:flex; flex-direction:column; align-items:center; transition:background 0.3s, color 0.3s; }
   #toolbar { margin:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  #board { border:1px solid #ccc; background:#fff; touch-action:none; }
+  #board { border:1px solid #ccc; background:#fff; touch-action:none; transition:background 0.3s; }
   button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; background:#4f46e5; color:#fff; }
   button:hover { background:#4338ca; }
-  #voice-status { font-weight:bold; margin-left:10px; }
   #room-timer { font-weight:bold; margin-left:10px; }
-</style>
 
+  /* Dark mode */
+  body.dark-mode { background:#111; color:#eee; }
+  body.dark-mode #board { background:#222; border:1px solid #555; }
+  body.dark-mode button { background:#333; color:#eee; }
+  body.dark-mode button:hover { background:#444; }
+</style>
 </head>
 <body>
 
 <div id="toolbar">
   <input type="color" id="color-picker" value="#000000">
   <button id="eraser-btn">Eraser: Off</button>
- <button id="clear-btn" style="display:none">Clear Board</button> 
+  <button id="clear-all-btn">Clear All</button>
   <button id="text-btn">Text: Off</button>
+  <button id="dark-mode-btn">Dark Mode</button>
   <button id="leave-room">Leave Room</button>
   <span id="room-timer">00:00:00</span>
 </div>
@@ -30,7 +35,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -58,22 +63,41 @@ const ctx = canvas.getContext("2d");
 let drawing=false, eraser=false, color=document.getElementById("color-picker").value, currentStroke=[];
 let textMode=false;
 
-// Toolbar
+ctx.lineJoin = "round";
+ctx.lineCap = "round";
+
+// Toolbar buttons
 document.getElementById("color-picker").addEventListener("change", e=>color=e.target.value);
-document.getElementById("eraser-btn").addEventListener("click", ()=>{ eraser=!eraser; document.getElementById("eraser-btn").innerText=`Eraser: ${eraser?"On":"Off"}`; });
-document.getElementById("text-btn").addEventListener("click", ()=>{ textMode=!textMode; document.getElementById("text-btn").innerText=`Text: ${textMode?"On":"Off"}`; });
+document.getElementById("eraser-btn").addEventListener("click", ()=>{
+  eraser=!eraser;
+  document.getElementById("eraser-btn").innerText=`Eraser: ${eraser?"On":"Off"}`;
+});
+document.getElementById("text-btn").addEventListener("click", ()=>{
+  textMode=!textMode;
+  document.getElementById("text-btn").innerText=`Text: ${textMode?"On":"Off"}`;
+});
+
+// Dark mode toggle
+document.getElementById("dark-mode-btn").addEventListener("click", ()=>{
+  document.body.classList.toggle("dark-mode");
+  const btn = document.getElementById("dark-mode-btn");
+  if(document.body.classList.contains("dark-mode")){
+    btn.innerText="Light Mode";
+  } else {
+    btn.innerText="Dark Mode";
+  }
+});
 
 // Helpers
 function getPos(e){ const rect=canvas.getBoundingClientRect(); return {x:e.clientX-rect.left, y:e.clientY-rect.top}; }
 
-// Drawing functions
+// Drawing
 function startDraw(pos){ drawing=true; currentStroke=[pos]; }
 function moveDraw(pos){
   if(!drawing) return;
   const last=currentStroke[currentStroke.length-1];
   ctx.strokeStyle = eraser?"#fff":color;
   ctx.lineWidth = eraser?20:2;
-  ctx.lineCap="round";
   ctx.beginPath();
   ctx.moveTo(last.x,last.y);
   ctx.lineTo(pos.x,pos.y);
@@ -82,10 +106,16 @@ function moveDraw(pos){
 }
 async function endDraw(){
   drawing=false;
-  if(currentStroke.length>1) await addDoc(collection(db,"rooms",roomId,"drawings"),{stroke:currentStroke,color:ctx.strokeStyle,width:ctx.lineWidth});
+  if(currentStroke.length>1){
+    await addDoc(collection(db,"rooms",roomId,"drawings"),{
+      stroke:currentStroke,
+      color:ctx.strokeStyle,
+      width:ctx.lineWidth
+    });
+  }
 }
 
-// Text function
+// Text add
 canvas.addEventListener("click", async (e)=>{
   if(!textMode) return;
   const pos = getPos(e);
@@ -97,7 +127,7 @@ canvas.addEventListener("click", async (e)=>{
   await addDoc(collection(db,"rooms",roomId,"texts"),{x:pos.x,y:pos.y,text,color});
 });
 
-// Mouse & Touch events
+// Mouse & Touch
 canvas.addEventListener("mousedown", e=>{ if(!textMode) startDraw(getPos(e)); });
 canvas.addEventListener("mousemove", e=>{ if(!textMode) moveDraw(getPos(e)); });
 canvas.addEventListener("mouseup", endDraw);
@@ -106,15 +136,22 @@ canvas.addEventListener("touchstart", e=>{ if(!textMode) startDraw(getPos(e.touc
 canvas.addEventListener("touchmove", e=>{ if(!textMode) moveDraw(getPos(e.touches[0])); e.preventDefault(); });
 canvas.addEventListener("touchend", endDraw);
 
-// Clear board
-document.getElementById("clear-btn").addEventListener("click", async ()=>{
+// Clear All
+document.getElementById("clear-all-btn").addEventListener("click", async ()=>{
   const drawingsCol = collection(db,"rooms",roomId,"drawings");
   const textsCol = collection(db,"rooms",roomId,"texts");
-  onSnapshot(drawingsCol, snap=>snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"drawings",d.id))));
-  onSnapshot(textsCol, snap=>snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"texts",d.id))));
+
+  const drawingsSnap = await getDocs(drawingsCol);
+  drawingsSnap.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"drawings",d.id)));
+
+  const textsSnap = await getDocs(textsCol);
+  textsSnap.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"texts",d.id)));
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  alert("Board Cleared!");
 });
 
-// Listen Firestore for live drawings
+// Listen Firestore
 onSnapshot(collection(db,"rooms",roomId,"drawings"), snapshot=>{
   snapshot.docChanges().forEach(change=>{
     if(change.type==="added"){
@@ -122,13 +159,15 @@ onSnapshot(collection(db,"rooms",roomId,"drawings"), snapshot=>{
       const s = d.stroke;
       ctx.strokeStyle=d.color; ctx.lineWidth=d.width;
       ctx.beginPath();
-      for(let i=1;i<s.length;i++){ ctx.moveTo(s[i-1].x,s[i-1].y); ctx.lineTo(s[i].x,s[i].y); ctx.stroke(); }
+      for(let i=1;i<s.length;i++){
+        ctx.moveTo(s[i-1].x,s[i-1].y);
+        ctx.lineTo(s[i].x,s[i].y);
+        ctx.stroke();
+      }
     }
     else if(change.type==="removed"){ ctx.clearRect(0,0,canvas.width,canvas.height); }
   });
 });
-
-// Listen Firestore for live texts
 onSnapshot(collection(db,"rooms",roomId,"texts"), snapshot=>{
   snapshot.docChanges().forEach(change=>{
     if(change.type==="added"){
@@ -140,7 +179,7 @@ onSnapshot(collection(db,"rooms",roomId,"texts"), snapshot=>{
   });
 });
 
-// Room timer
+// Timer
 let startTime=Date.now();
 setInterval(()=>{
   let elapsed = Date.now()-startTime;
@@ -149,8 +188,10 @@ setInterval(()=>{
 },1000);
 
 // Leave Room
-document.getElementById("leave-room").addEventListener("click", async ()=>{ await signOut(auth); window.location.href="login.html"; });
-
-</script> 
+document.getElementById("leave-room").addEventListener("click", async ()=>{
+  await signOut(auth);
+  window.location.href="login.html";
+});
+</script>
 </body>
 </html>
