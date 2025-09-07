@@ -1,37 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Online Classroom - Whiteboard, Text & Voice</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Online Classroom — Whiteboard</title>
 <style>
-  body { margin:0; font-family:"Segoe UI",sans-serif; background:#f8faff; display:flex; flex-direction:column; align-items:center; }
-  #toolbar { margin:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  #board { border:1px solid #ccc; background:#fff; touch-action:none; }
-  button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; background:#4f46e5; color:#fff; }
-  button:hover { background:#4338ca; }
-  #voice-status { font-weight:bold; margin-left:10px; }
-  #room-timer { font-weight:bold; margin-left:10px; }
+  :root{
+    --brand:#4f46e5;
+    --brand-dark:#4338ca;
+    --bg:#f8faff;
+    --card:#ffffff;
+    --text:#2c3e50;
+    --muted:#667085;
+    --danger:#e74c3c;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);font-family:"Segoe UI", Tahoma, sans-serif;color:var(--text);
+    display:flex;flex-direction:column;min-height:100vh;
+  }
+  header{
+    position:sticky;top:0;background:var(--card);z-index:20;border-bottom:1px solid #eef2f7;
+  }
+  .bar{
+    max-width:1200px;margin:0 auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+    padding:10px 16px;
+  }
+  .title{font-weight:700;letter-spacing:.3px;margin-right:auto}
+  button,.btn{
+    background:var(--brand);color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;
+    transition:.2s;font-weight:600
+  }
+  button:hover{background:var(--brand-dark)}
+  .btn-outline{background:#fff;color:var(--brand);border:1px solid #dcdfe6}
+  .btn-outline:hover{background:#f4f5ff}
+  .btn-danger{background:var(--danger)}
+  .btn-danger:hover{background:#c0392b}
+  .chip{padding:8px 10px;border-radius:10px;background:#f2f3ff;border:1px solid #e7e9ff;color:#3b37b3;font-weight:600}
+  main{max-width:1200px;margin:14px auto;display:grid;grid-template-columns:1fr 300px;gap:16px;padding:0 16px; width:100%}
+  .panel{background:var(--card);border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.06);padding:12px}
+  #board{width:100%;height:auto;border:1px solid #dcdfe6;border-radius:12px;background:#fff;touch-action:none;display:block}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .col{display:flex;flex-direction:column;gap:6px}
+  label{font-size:12px;color:var(--muted)}
+  input[type="range"]{width:160px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .divider{height:1px;background:#eef2f7;margin:8px 0}
+  #toast{
+    position:fixed;left:50%;top:14px;transform:translateX(-50%);
+    background:#111827;color:#fff;padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;
+    transition:.25s;z-index:40;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2)
+  }
+  #toast.show{opacity:1}
+  #participants{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:8px}
+  #participants li{background:#f3f4ff;border:1px solid #e7e9ff;color:#3730a3;padding:6px 10px;border-radius:999px;font-weight:600}
+  .side-title{font-weight:700;margin-bottom:8px}
+  .pill{padding:6px 10px;border:1px solid #e9eef5;border-radius:8px;background:#fafcff}
+  .note{font-size:12px;color:#6b7280}
+  @media (max-width:1024px){ main{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
 
-<div id="toolbar">
-  <input type="color" id="color-picker" value="#000000">
-  <button id="eraser-btn">Eraser: Off</button>
-  <button id="clear-btn">Clear Board</button>
-  <button id="text-btn">Text: Off</button>
-  <button id="leave-room">Leave Room</button>
-  <span id="voice-status">Voice: Off</span>
-  <span id="room-timer">00:00:00</span>
-</div>
+<header>
+  <div class="bar">
+    <div class="title">🧑‍🏫 Online Classroom — Whiteboard</div>
+    <button id="save-btn" title="Save board as PNG">Save PNG</button>
+    <button id="clear-btn" class="btn-outline" title="Clear the board">Clear</button>
+    <span class="chip" id="room-chip">Room: —</span>
+    <button id="leave-btn" class="btn-danger">Leave Room</button>
+  </div>
+</header>
 
-<canvas id="board" width="800" height="500"></canvas>
+<main>
+  <section class="panel">
+    <!-- Top controls -->
+    <div class="controls" style="margin-bottom:10px">
+      <div class="col">
+        <label>Color</label>
+        <input type="color" id="color-picker" value="#111111">
+      </div>
+
+      <div class="col">
+        <label>Brush Size <span id="size-val" class="pill">3</span></label>
+        <div class="row">
+          <button id="size-dec" class="btn-outline" title="Smaller">−</button>
+          <input type="range" id="size-slider" min="1" max="30" value="3">
+          <button id="size-inc" class="btn-outline" title="Bigger">+</button>
+        </div>
+      </div>
+
+      <div class="col">
+        <label>Mode</label>
+        <div class="row">
+          <button id="pen-btn" class="btn">Pen</button>
+          <button id="eraser-btn" class="btn-outline">Eraser</button>
+          <button id="text-btn" class="btn-outline">Text</button>
+        </div>
+      </div>
+
+      <div class="col">
+        <label>Canvas Width <span id="w-val" class="pill">800</span></label>
+        <div class="row">
+          <input type="range" id="width-slider" min="500" max="1400" value="800">
+        </div>
+      </div>
+
+      <div class="col">
+        <label>Canvas Height <span id="h-val" class="pill">500</span></label>
+        <div class="row">
+          <input type="range" id="height-slider" min="300" max="900" value="500">
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <canvas id="board" width="800" height="500"></canvas>
+
+    <!-- Footer info -->
+    <div class="row" style="justify-content:space-between;margin-top:8px">
+      <div class="note">Tip: Text মোডে বোর্ডে ট্যাপ করলে টেক্সট টাইপ করতে পারবে।</div>
+      <div class="note">Realtime sync সক্রিয় ✅</div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="side-title">Participants</div>
+    <ul id="participants"></ul>
+    <div class="divider"></div>
+
+    <div class="side-title">Room Info</div>
+    <div class="pill" id="user-pill">You: —</div>
+    <div class="row" style="margin-top:8px">
+      <div class="pill" id="timer-pill">00:00:00</div>
+    </div>
+  </aside>
+</main>
+
+<div id="toast">Board cleared</div>
 
 <script type="module">
+/** ---------- Firebase ---------- **/
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc,
+  getDocs, serverTimestamp, setDoc
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA_cKg4aCmS2EUJhE8Baq-wQK26Smu7pxY",
@@ -42,157 +157,261 @@ const firebaseConfig = {
   appId: "1:319313107001:web:52e7f5ca05e8721dded5e8"
 };
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-// Room info
-const params = new URLSearchParams(window.location.search);
+/** ---------- Params & Guards ---------- **/
+const params = new URLSearchParams(location.search);
 const roomId = params.get("roomId");
 const username = params.get("username");
-if(!roomId || !username){ alert("Invalid Room!"); window.location.href="login.html"; }
-onAuthStateChanged(auth, user => { if(!user){ alert("Login required!"); window.location.href="login.html"; } });
+if(!roomId || !username){
+  alert("Invalid room. Redirecting to login.");
+  location.href = "login.html";
+}
+document.getElementById("room-chip").textContent = `Room: ${roomId.slice(0,6)}…`;
 
-// Canvas setup
+/** ---------- Presence (participants) ---------- **/
+let meDocRef = null;
+onAuthStateChanged(auth, async (user) => {
+  if(!user){
+    alert("Login required"); location.href = "login.html"; return;
+  }
+  document.getElementById("user-pill").textContent = `You: ${username}`;
+  // create/update my presence doc
+  meDocRef = doc(collection(db, "rooms", roomId, "participants"), user.uid);
+  await setDoc(meDocRef, {
+    uid: user.uid,
+    name: username,
+    joinedAt: serverTimestamp()
+  }, { merge: true });
+
+  // remove presence on leave/close
+  window.addEventListener("beforeunload", async () => {
+    try{ await deleteDoc(meDocRef); }catch(_){}
+  });
+});
+
+// live participants list
+onSnapshot(collection(db, "rooms", roomId, "participants"), (snap) => {
+  const ul = document.getElementById("participants");
+  ul.innerHTML = "";
+  snap.forEach(d => {
+    const li = document.createElement("li");
+    li.textContent = d.data().name || "User";
+    ul.appendChild(li);
+  });
+});
+
+/** ---------- Canvas & Drawing ---------- **/
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
-let drawing=false, eraser=false, color=document.getElementById("color-picker").value, currentStroke=[];
-let textMode=false;
+let mode = "pen"; // pen | eraser | text
+let color = document.getElementById("color-picker").value;
+let size = parseInt(document.getElementById("size-slider").value, 10);
+let drawing = false;
+let stroke = []; // buffered points to save once per stroke
+const strokesCache = []; // for re-render on resize
+const textsCache = [];
 
-// Toolbar
-document.getElementById("color-picker").addEventListener("change", e=>color=e.target.value);
-document.getElementById("eraser-btn").addEventListener("click", ()=>{ eraser=!eraser; document.getElementById("eraser-btn").innerText=`Eraser: ${eraser?"On":"Off"}`; });
-document.getElementById("text-btn").addEventListener("click", ()=>{ textMode=!textMode; document.getElementById("text-btn").innerText=`Text: ${textMode?"On":"Off"}`; });
+const sizeVal = document.getElementById("size-val");
+sizeVal.textContent = size;
+
+function setMode(m){
+  mode = m;
+  document.getElementById("pen-btn").className = m==="pen" ? "btn" : "btn-outline";
+  document.getElementById("eraser-btn").className = m==="eraser" ? "btn" : "btn-outline";
+  document.getElementById("text-btn").className = m==="text" ? "btn" : "btn-outline";
+}
+setMode("pen");
+
+// Controls
+document.getElementById("color-picker").addEventListener("change", e => color = e.target.value);
+document.getElementById("size-slider").addEventListener("input", e => {
+  size = parseInt(e.target.value, 10);
+  sizeVal.textContent = size;
+});
+document.getElementById("size-dec").addEventListener("click", () => {
+  size = Math.max(1, size-1);
+  document.getElementById("size-slider").value = size;
+  sizeVal.textContent = size;
+});
+document.getElementById("size-inc").addEventListener("click", () => {
+  size = Math.min(30, size+1);
+  document.getElementById("size-slider").value = size;
+  sizeVal.textContent = size;
+});
+document.getElementById("pen-btn").addEventListener("click", () => setMode("pen"));
+document.getElementById("eraser-btn").addEventListener("click", () => setMode("eraser"));
+document.getElementById("text-btn").addEventListener("click", () => setMode("text"));
 
 // Helpers
-function getPos(e){ const rect=canvas.getBoundingClientRect(); return {x:e.clientX-rect.left, y:e.clientY-rect.top}; }
-
-// Drawing functions
-function startDraw(pos){ drawing=true; currentStroke=[pos]; }
-function moveDraw(pos){
-  if(!drawing) return;
-  const last=currentStroke[currentStroke.length-1];
-  ctx.strokeStyle = eraser?"#fff":color;
-  ctx.lineWidth = eraser?20:2;
-  ctx.lineCap="round";
+function getPos(evt){
+  const rect = canvas.getBoundingClientRect();
+  return { x: (evt.clientX - rect.left), y: (evt.clientY - rect.top) };
+}
+function drawSegment(a,b,c,w){
+  ctx.strokeStyle = c;
+  ctx.lineWidth = w;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(last.x,last.y);
-  ctx.lineTo(pos.x,pos.y);
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
   ctx.stroke();
-  currentStroke.push(pos);
+}
+function redrawAll(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(const s of strokesCache){
+    const pts = s.stroke;
+    for(let i=1;i<pts.length;i++){
+      drawSegment(pts[i-1], pts[i], s.color, s.width);
+    }
+  }
+  for(const t of textsCache){
+    ctx.fillStyle = t.color;
+    ctx.font = `${t.size || 20}px Arial`;
+    ctx.fillText(t.text, t.x, t.y);
+  }
+}
+
+// Mouse/Touch drawing
+function startDraw(p){
+  if(mode==="text"){
+    const text = prompt("Enter text:");
+    if(!text) return;
+    const record = { x: p.x, y: p.y, text, color, size: 20, ts: Date.now() };
+    textsCache.push(record);
+    ctx.fillStyle = color; ctx.font = "20px Arial"; ctx.fillText(text, p.x, p.y);
+    addDoc(collection(db, "rooms", roomId, "texts"), record);
+    return;
+  }
+  drawing = true;
+  stroke = [{x:p.x,y:p.y}];
+}
+function moveDraw(p){
+  if(!drawing) return;
+  const last = stroke[stroke.length-1];
+  const drawColor = (mode==="eraser") ? "#ffffff" : color;
+  const drawWidth = (mode==="eraser") ? Math.max(12, size*3) : size;
+  drawSegment(last, p, drawColor, drawWidth);
+  stroke.push({x:p.x,y:p.y});
 }
 async function endDraw(){
-  drawing=false;
-  if(currentStroke.length>1) await addDoc(collection(db,"rooms",roomId,"drawings"),{stroke:currentStroke,color:ctx.strokeStyle,width:ctx.lineWidth});
+  if(!drawing) return;
+  drawing = false;
+  if(stroke.length>1){
+    const docData = { stroke, color: (mode==="eraser")?"#ffffff":color, width: (mode==="eraser")?Math.max(12, size*3):size, ts: Date.now() };
+    strokesCache.push(docData);
+    try{ await addDoc(collection(db,"rooms",roomId,"drawings"), docData); }catch(e){ console.error(e); }
+  }
+  stroke = [];
 }
 
-// Text function
-canvas.addEventListener("click", async (e)=>{
-  if(!textMode) return;
-  const pos = getPos(e);
-  const text = prompt("Enter text:");
-  if(!text) return;
-  ctx.fillStyle=color;
-  ctx.font="20px Arial";
-  ctx.fillText(text,pos.x,pos.y);
-  await addDoc(collection(db,"rooms",roomId,"texts"),{x:pos.x,y:pos.y,text,color});
-});
+// Bind events
+canvas.addEventListener("mousedown", e => startDraw(getPos(e)));
+canvas.addEventListener("mousemove", e => moveDraw(getPos(e)));
+window.addEventListener("mouseup", endDraw);
+canvas.addEventListener("touchstart", e => { e.preventDefault(); startDraw(getPos(e.touches[0])); }, {passive:false});
+canvas.addEventListener("touchmove", e => { e.preventDefault(); moveDraw(getPos(e.touches[0])); }, {passive:false});
+canvas.addEventListener("touchend", e => { e.preventDefault(); endDraw(); }, {passive:false});
 
-// Mouse & Touch events
-canvas.addEventListener("mousedown", e=>{ if(!textMode) startDraw(getPos(e)); });
-canvas.addEventListener("mousemove", e=>{ if(!textMode) moveDraw(getPos(e)); });
-canvas.addEventListener("mouseup", endDraw);
-canvas.addEventListener("mouseout", endDraw);
-canvas.addEventListener("touchstart", e=>{ if(!textMode) startDraw(getPos(e.touches[0])); e.preventDefault(); });
-canvas.addEventListener("touchmove", e=>{ if(!textMode) moveDraw(getPos(e.touches[0])); e.preventDefault(); });
-canvas.addEventListener("touchend", endDraw);
-
-// Clear board
-document.getElementById("clear-btn").addEventListener("click", async ()=>{
-  const drawingsCol = collection(db,"rooms",roomId,"drawings");
-  const textsCol = collection(db,"rooms",roomId,"texts");
-  onSnapshot(drawingsCol, snap=>snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"drawings",d.id))));
-  onSnapshot(textsCol, snap=>snap.docs.forEach(d=>deleteDoc(doc(db,"rooms",roomId,"texts",d.id))));
-});
-
-// Listen Firestore for live drawings
-onSnapshot(collection(db,"rooms",roomId,"drawings"), snapshot=>{
-  snapshot.docChanges().forEach(change=>{
-    if(change.type==="added"){
-      const d = change.doc.data();
-      const s = d.stroke;
-      ctx.strokeStyle=d.color; ctx.lineWidth=d.width;
-      ctx.beginPath();
-      for(let i=1;i<s.length;i++){ ctx.moveTo(s[i-1].x,s[i-1].y); ctx.lineTo(s[i].x,s[i].y); ctx.stroke(); }
+// Live listeners (drawings)
+onSnapshot(collection(db,"rooms",roomId,"drawings"), (snapshot) => {
+  snapshot.docChanges().forEach(ch => {
+    if(ch.type === "added"){
+      const d = ch.doc.data();
+      strokesCache.push(d);
+      const pts = d.stroke;
+      for(let i=1;i<pts.length;i++){
+        drawSegment(pts[i-1], pts[i], d.color, d.width);
+      }
+    } else if(ch.type === "removed"){
+      // full redraw from cache (after local clear we also clear cache)
+      redrawAll();
     }
-    else if(change.type==="removed"){ ctx.clearRect(0,0,canvas.width,canvas.height); }
   });
 });
-
-// Listen Firestore for live texts
-onSnapshot(collection(db,"rooms",roomId,"texts"), snapshot=>{
-  snapshot.docChanges().forEach(change=>{
-    if(change.type==="added"){
-      const t = change.doc.data();
-      ctx.fillStyle=t.color;
-      ctx.font="20px Arial";
-      ctx.fillText(t.text,t.x,t.y);
+// Live listeners (texts)
+onSnapshot(collection(db,"rooms",roomId,"texts"), (snapshot) => {
+  snapshot.docChanges().forEach(ch => {
+    if(ch.type === "added"){
+      const t = ch.doc.data();
+      textsCache.push(t);
+      ctx.fillStyle = t.color;
+      ctx.font = `${t.size || 20}px Arial`;
+      ctx.fillText(t.text, t.x, t.y);
+    } else if(ch.type === "removed"){
+      redrawAll();
     }
   });
 });
 
-// Room timer
-let startTime=Date.now();
-setInterval(()=>{
-  let elapsed = Date.now()-startTime;
-  let h=Math.floor(elapsed/3600000), m=Math.floor((elapsed%3600000)/60000), s=Math.floor((elapsed%60000)/1000);
-  document.getElementById("room-timer").innerText=`${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;
-},1000);
+/** ---------- Canvas Resize (both width/height) ---------- **/
+const wSlider = document.getElementById("width-slider");
+const hSlider = document.getElementById("height-slider");
+const wVal = document.getElementById("w-val");
+const hVal = document.getElementById("h-val");
 
-// Leave Room
-document.getElementById("leave-room").addEventListener("click", async ()=>{ await signOut(auth); window.location.href="login.html"; });
+function resizeCanvas(w, h){
+  // Keep current image as data, then resize, then redraw caches for pixel-perfect
+  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+  canvas.width = w; canvas.height = h;
+  ctx.putImageData(img,0,0);
+  // Full redraw from logical caches (keeps consistency)
+  redrawAll();
+}
+wSlider.addEventListener("input", e => { const w = parseInt(e.target.value,10); wVal.textContent = w; resizeCanvas(w, canvas.height); });
+hSlider.addEventListener("input", e => { const h = parseInt(e.target.value,10); hVal.textContent = h; resizeCanvas(canvas.width, h); });
 
-// Voice System
-let localStream, peers={};
-const voiceStatus=document.getElementById("voice-status");
-async function initVoice(){
+/** ---------- Clear (one click = one clear) ---------- **/
+const toast = document.getElementById("toast");
+function showToast(msg="Board cleared"){
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(()=>toast.classList.remove("show"), 1600);
+}
+document.getElementById("clear-btn").addEventListener("click", async () => {
+  if(!confirm("Clear the whole board for everyone?")) return;
+  // delete drawings
+  const drawingsSnap = await getDocs(collection(db,"rooms",roomId,"drawings"));
+  const textsSnap = await getDocs(collection(db,"rooms",roomId,"texts"));
+  const promises = [];
+  drawingsSnap.forEach(d => promises.push(deleteDoc(doc(db,"rooms",roomId,"drawings", d.id))));
+  textsSnap.forEach(d => promises.push(deleteDoc(doc(db,"rooms",roomId,"texts", d.id))));
+  await Promise.all(promises);
+  // local clear & caches reset
+  strokesCache.length = 0;
+  textsCache.length = 0;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  showToast("Board cleared for all");
+});
+
+/** ---------- Save as PNG ---------- **/
+document.getElementById("save-btn").addEventListener("click", () => {
+  const link = document.createElement("a");
+  link.download = `whiteboard-${roomId}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+});
+
+/** ---------- Timer ---------- **/
+const timer = document.getElementById("timer-pill");
+const started = Date.now();
+setInterval(() => {
+  const ms = Date.now() - started;
+  const h = Math.floor(ms/3600000);
+  const m = Math.floor((ms%3600000)/60000);
+  const s = Math.floor((ms%60000)/1000);
+  timer.textContent = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}, 1000);
+
+/** ---------- Leave Room ---------- **/
+document.getElementById("leave-btn").addEventListener("click", async () => {
   try{
-    localStream = await navigator.mediaDevices.getUserMedia({audio:true});
-    voiceStatus.innerText="Voice: On";
-    const signalsCol=collection(db,"rooms",roomId,"signals");
-    onSnapshot(signalsCol,snapshot=>{
-      snapshot.docChanges().forEach(async change=>{
-        if(change.type!=="added") return;
-        const data=change.doc.data();
-        if(data.sender===auth.currentUser.uid) return;
-        const peerId=data.sender;
-        if(!peers[peerId]){
-          const pc=new RTCPeerConnection();
-          localStream.getTracks().forEach(track=>pc.addTrack(track,localStream));
-          pc.ontrack=e=>{ const audio=document.createElement("audio"); audio.srcObject=e.streams[0]; audio.autoplay=true; document.body.appendChild(audio); };
-          peers[peerId]=pc;
-        }
-        const pc=peers[peerId];
-        if(data.type==="offer"){ await pc.setRemoteDescription(data.offer); const answer=await pc.createAnswer(); await pc.setLocalDescription(answer); await addDoc(signalsCol,{sender:auth.currentUser.uid,type:"answer",answer}); }
-        else if (data.type === "answer") {
-  await pc.setRemoteDescription(data.answer);
-}
-else if (data.type === "ice") {
-  await pc.addIceCandidate(data.candidate);
-                  }
+    if(meDocRef) await deleteDoc(meDocRef);
+    await signOut(auth);
+  }catch(_){}
+  location.href = "login.html";
 });
-});
-} catch (err) {
-  voiceStatus.innerText = "Voice: Off";
-  console.error("Voice error:", err);
-}
-}
-initVoice();
-</script> 
+</script>
 </body>
 </html>
-        
-        
-        
-        
-        
-        
