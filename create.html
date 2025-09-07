@@ -5,17 +5,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Online Classroom - Rooms</title>
 <style>
-body { margin:0; font-family:"Segoe UI", sans-serif; background:#f8faff; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; padding-top:50px;}
-.container { background:#fff; padding:30px 25px; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,0.1); width:400px;}
-h2 { text-align:center; color:#2c3e50; margin-bottom:20px; }
-input { width:100%; padding:12px; margin:10px 0; border:1px solid #dcdfe6; border-radius:8px; outline:none; font-size:14px; }
-button { width:100%; padding:12px; margin-top:12px; border:none; border-radius:8px; font-size:16px; cursor:pointer; background:#4f46e5; color:#fff; transition:0.3s; }
-button:hover { background:#4338ca; }
-.switch { text-align:center; margin-top:15px; font-size:14px; cursor:pointer; color:#4f46e5; }
-#logout-btn { margin-top: 20px; background:#e74c3c; }
-#logout-btn:hover { background:#c0392b; }
-.copy-btn { margin-top: 8px; background:#2ecc71; }
-.copy-btn:hover { background:#27ae60; }
+body {
+  margin:0;
+  font-family:"Segoe UI", sans-serif;
+  background:#e0f2fe;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  min-height:100vh;
+  padding-top:50px;
+}
+
+/* Container with fade-in */
+.container {
+  background:#ffffff;
+  padding:30px 25px;
+  border-radius:16px;
+  box-shadow:0 12px 28px rgba(0,0,0,0.12);
+  width:400px;
+  opacity:0;
+  transform: translateY(-15px);
+  animation: fadeInUp 0.8s forwards;
+}
+
+@keyframes fadeInUp {
+  to { opacity:1; transform: translateY(0); }
+}
+
+h2 {
+  text-align:center;
+  color:#1e3a8a;
+  margin-bottom:20px;
+}
+
+/* Inputs */
+input {
+  width:100%;
+  padding:12px;
+  margin:10px 0;
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  outline:none;
+  font-size:14px;
+  transition: 0.3s;
+}
+
+input:focus {
+  border-color:#2563eb;
+  box-shadow:0 2px 6px rgba(37,99,235,0.2);
+}
+
+/* Buttons */
+button {
+  width:100%;
+  padding:12px;
+  margin-top:12px;
+  border:none;
+  border-radius:8px;
+  font-size:16px;
+  cursor:pointer;
+  transition: all 0.3s ease;
+  font-weight:500;
+}
+
+/* Create Room */
+#create-room-btn { background:#4f46e5; color:#fff; }
+#create-room-btn:hover { background:#4338ca; transform: translateY(-2px); }
+
+/* Copy Room ID */
+.copy-btn { background:#2ecc71; color:#fff; }
+.copy-btn:hover { background:#27ae60; transform: translateY(-2px); }
+
+/* Logout buttons */
+#logout-btn, #logout-btn-join { background:#e74c3c; color:#fff; }
+#logout-btn:hover, #logout-btn-join:hover { background:#c0392b; transform: translateY(-2px); }
+
+/* Join Room */
+#join-room-btn { background:#4f46e5; color:#fff; }
+#join-room-btn:hover { background:#4338ca; transform: translateY(-2px); }
+
+/* Switch links */
+.switch {
+  text-align:center;
+  margin-top:15px;
+  font-size:14px;
+  cursor:pointer;
+  color:#2563eb;
+  transition: color 0.3s;
+}
+.switch:hover { color:#1e40af; }
 </style>
 </head>
 <body>
@@ -44,7 +122,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebas
 import { getFirestore, collection, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyA_cKg4aCmS2EUJhE8Baq-wQK26Smu7pxY",
   authDomain: "myclassroom-67acf.firebaseapp.com",
@@ -131,11 +208,9 @@ document.getElementById("join-room-btn").addEventListener("click", async () => {
     if(roomData.password !== password){ alert("❌ Wrong Room Password!"); return; }
 
     alert(`✅ Welcome ${username} to Room: ${roomData.name}`);
-    // Redirect to whiteboard page
     window.location.href = `whiteboard.html?roomId=${roomId}&username=${username}`;
   } catch(err){ alert("❌ " + err.message); }
 });
-
 </script>
 </body>
 </html>
